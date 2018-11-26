@@ -104,43 +104,38 @@ class Worker(object):
         self.queued_tasks = Queue.Queue()
         self.id = id
         self.worker_time_pairs = dict()
+        self.worker_load_infos = {} # worker id: [load, timestamp]
         self.last_token_sent_time = -1000000
 
     def recv_gossip_info(self, source_worker, gossip_info):
-        for (w, t) in gossip_info:
-            self.worker_time_pairs[w] = t
+        for w, info in gossip_info:
+            if w in self.worker_load_infos:
+                if info[1] > self.worker_load_infos[w][1]:
+                    self.worker_load_infos[w] = info
+            else:
+                self.worker_load_infos[w] = info
+
 
     def get_random_worker(self, current_time):
-        workers = self.worker_time_pairs.keys()
+        workers = self.worker_load_infos.keys()
         threshold = 100
+        # Remove stale load information
         for w in workers:
-            t = self.worker_time_pairs[w]
-            #Filter older tokens
-            if(current_time - t > threshold):
-                del self.worker_time_pairs[w]
-        if(len(self.worker_time_pairs) > 0):
-            w = random.choice(self.worker_time_pairs.keys())
-            del self.worker_time_pairs[w]
-            return w
+            info = self.worker_load_infos[w]
+            if current_time - info[1] > threshold:
+                del self.worker_load_infos[w]
+
+        if len(self.worker_load_infos) != 0:
+            # Pick a random node from top 5 nodes
+            return sorted(self.worker_load_infos.items(), key=lambda x: x[1][1])[0][0]
         else:
             return random.choice(self.simulation.worker_indices)
 
     def get_gossip_info(self, current_time):
         ret = []
-        threshold = 100
-        workers = self.worker_time_pairs.keys()
-        for w in workers:
-            t = self.worker_time_pairs[w]
-            if(current_time - t <= threshold):
-                if(random.randint(1, 10) == 7):
-                    ret.append((w, t))
-                    del self.worker_time_pairs[w]
-            else:
-                del self.worker_time_pairs[w]
-        if(self.queued_tasks.qsize() == 0 and current_time - self.last_token_sent_time > 10):
-            #!TODO: Check if self.id is same as worker_index
-            ret.append((self.id, current_time))
-            self.last_token_sent_time = current_time
+        for w, info in self.worker_time_pairs.items():
+                ret.append((w, info))
+        ret.append((self.id, [self.queued_tasks.qsize(), current_time]))
         return ret
 
     def add_task(self, current_time, task_duration, job_id):

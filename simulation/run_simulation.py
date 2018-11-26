@@ -1,12 +1,12 @@
 #
 # Copyright 2013 The Regents of The University California
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,9 +19,12 @@ import simulation_batch
 import simulation_centralized
 import simulation_multi
 import simulation_cancellation
-import simulation_fulcrum
-import simulation_fulcrum2
+import simulation_hopper
+import simulation_hopper2
+import simulation_hopper3
 import util
+import math
+
 
 def get_percentile(N, percent, key=lambda x:x):
     if not N:
@@ -38,30 +41,32 @@ def get_percentile(N, percent, key=lambda x:x):
 NUM_JOBS = 5000
 DISTRIBUTION = util.TaskDistributions.EXP_JOBS
 
-loads = [0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95]
+# loads = [0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95]
 #loads = [0.1, 0.3, 0.5]
-#loads = [0.95]
+loads = [0.95]
 loads.reverse()
 for load in loads:
     print "Running simulations at %s load" % load
 
-    print "\nFulcrum2"
-    s = simulation_fulcrum2.Simulation(NUM_JOBS, "fulcrum2_%s" % load, load, DISTRIBUTION)
-    s.run()
-
-    print "\nFulcrum"
-    s = simulation_fulcrum.Simulation(NUM_JOBS, "fulcrum_%s" % load, load, DISTRIBUTION)
-    s.run()
-
-    print "******Multiget"
-    s = simulation_multi.Simulation(NUM_JOBS, "multi_tasks_%s" % load, load, DISTRIBUTION)
+    simulation_hopper3.HOP_COUNT = 10
+    simulation_hopper3.BATCH_SIZE = 1
+    print "\nHopper3 - HopCount = %d - BatchSize = %d"%(simulation_hopper3.HOP_COUNT, simulation_hopper3.BATCH_SIZE)
+    s = simulation_hopper3.Simulation(NUM_JOBS, "hopper2_%s" % load, load, DISTRIBUTION)
     s.run()
     continue
+
+    print "\nHopper"
+    s = simulation_hopper.Simulation(NUM_JOBS, "hopper_%s" % load, load, DISTRIBUTION)
+    s.run()
 
     print "\nSparrow"
     simulation_cancellation.WORK_STEALING = False
     simulation_cancellation.CANCELLATION = False
     s = simulation_cancellation.Simulation(NUM_JOBS, "sparrow_%s" % load, load, DISTRIBUTION)
+    s.run()
+
+    print "\nMultiget"
+    s = simulation_multi.Simulation(NUM_JOBS, "multi_tasks_%s" % load, load, DISTRIBUTION)
     s.run()
 
     print "\nCancellation"
@@ -88,14 +93,9 @@ for load in loads:
     s = simulation_batch.Simulation(NUM_JOBS, "batch_%s" % load, load, DISTRIBUTION)
     s.run()
 
-    continue
-    print "Work Stealing (10000 schedulers)"
+    print "\nWork Stealing (10000 schedulers)"
     simulation_cancellation.WORK_STEALING = True
     simulation_cancellation.NUM_SCHEDULERS = 10000
     simulation_cancellation.CANCELLATION = False
     s = simulation_cancellation.Simulation(NUM_JOBS, "stealing_s10000_%s" % load, load, DISTRIBUTION)
     s.run()
-
-    continue
-
-

@@ -4,3 +4,5 @@
 target/
 *.swp
 *.pyc
+*.data
+*.*_tasks_stolen
